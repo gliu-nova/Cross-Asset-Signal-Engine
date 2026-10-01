@@ -168,9 +168,11 @@ Charts save to `data/charts/` and upload via Twitter media API. Under ~2MB for f
 
 ## Setup
 
+Requires Python 3.14. GitHub Actions uses the same version.
+
 ```bash
 cd Cross-Asset-Signal-Engine
-python3 -m venv .venv
+python3.14 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env

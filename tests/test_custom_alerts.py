@@ -80,7 +80,9 @@ class CustomAlertTests(unittest.TestCase):
 
     def test_dark_pool_uses_db_history_without_network(self) -> None:
         settings = indicator_settings(self.cfg, "dark_pool_spy")
-        day = datetime(2026, 1, 2, tzinfo=timezone.utc)
+        # History lookup keeps the last 220 days. Anchor to now so the seed
+        # does not age out of that window.
+        day = datetime.now(timezone.utc) - timedelta(days=40)
         for i in range(30):
             save_reading(
                 self.conn,
