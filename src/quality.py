@@ -7,7 +7,7 @@ from typing import Any
 
 import requests
 
-from src.fetch import FRED_BASE, FEAR_GREED_BASE, COINGECKO_BASE, FetchError, fetch_indicator
+from src.fetch import FEAR_GREED_BASE, COINGECKO_BASE, FetchError, fetch_indicator, fred_api_status
 from src.market_hours import market_hours_note
 
 
@@ -58,7 +58,7 @@ def cross_verify(
     fetch_cfg = {k: v for k, v in verify_cfg.items() if k != "tolerance_pct"}
     try:
         secondary, _ = fetch_indicator(fetch_cfg)
-    except FetchError as e:
+    except (FetchError, requests.RequestException) as e:
         print(f"[warn] {name}: cross-verify skipped ({e})")
         return
     validate_value(secondary, f"{name} verify")
@@ -130,12 +130,7 @@ def check_api_health() -> dict[str, str]:
         results["fred"] = "missing FRED_API_KEY"
     else:
         try:
-            r = requests.get(
-                FRED_BASE,
-                params={"series_id": "DFF", "api_key": key, "file_type": "json", "limit": 1},
-                timeout=15,
-            )
-            r.raise_for_status()
+            fred_api_status(key)
             results["fred"] = "ok"
         except Exception as e:
             results["fred"] = str(e)

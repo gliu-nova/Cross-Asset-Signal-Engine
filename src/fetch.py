@@ -70,20 +70,75 @@ def _fred_api_key() -> str:
     return key
 
 
-def _fred_latest(series_id: str) -> tuple[float, str]:
-    resp = _http_get(
+def _body_snippet(resp: requests.Response, limit: int = 120) -> str:
+    text = " ".join((resp.text or "").split())
+    if len(text) > limit:
+        return text[:limit] + "..."
+    return text
+
+
+def fred_response_json(resp: requests.Response, series_id: str) -> dict[str, Any]:
+    """Parse a FRED payload. An empty or HTML body becomes FetchError."""
+    content_type = resp.headers.get("Content-Type", "")
+    media = content_type.split(";", 1)[0].strip().lower()
+    detail = (
+        f"FRED {series_id} returned non-JSON "
+        f"(status {resp.status_code}, content-type {content_type!r}, body {_body_snippet(resp)!r})"
+    )
+    if media and "json" not in media:
+        raise FetchError(detail)
+    text = (resp.text or "").lstrip("\ufeff \t\r\n")
+    if not text or text[0] not in "{[":
+        raise FetchError(detail)
+    try:
+        body = resp.json()
+    except requests.RequestException as e:
+        raise FetchError(detail) from e
+    if not isinstance(body, dict):
+        raise FetchError(detail)
+    return body
+
+
+def _fred_get(series_id: str, params: dict[str, Any], *, label: str) -> dict[str, Any]:
+    """GET a FRED series and parse JSON. One extra try when the body is not JSON."""
+    for attempt in range(2):
+        resp = _http_get(FRED_BASE, params=params, timeout=30, label=label)
+        try:
+            return fred_response_json(resp, series_id)
+        except FetchError:
+            if attempt == 0:
+                time.sleep(1.0)
+                continue
+            raise
+    raise FetchError(f"FRED {series_id} request failed")
+
+
+def fred_api_status(api_key: str) -> None:
+    """Raise unless FRED returns a JSON observations payload for DFF."""
+    resp = requests.get(
         FRED_BASE,
-        params={
+        params={"series_id": "DFF", "api_key": api_key, "file_type": "json", "limit": 1},
+        timeout=15,
+    )
+    resp.raise_for_status()
+    body = fred_response_json(resp, "DFF")
+    if body.get("error_code") or not isinstance(body.get("observations"), list):
+        message = body.get("error_message") or "missing observations"
+        raise FetchError(f"FRED health failed: {message}")
+
+
+def _fred_latest(series_id: str) -> tuple[float, str]:
+    body = _fred_get(
+        series_id,
+        {
             "series_id": series_id,
             "api_key": _fred_api_key(),
             "file_type": "json",
             "sort_order": "desc",
             "limit": 5,
         },
-        timeout=30,
         label=f"FRED {series_id}",
     )
-    body = resp.json()
     if body.get("error_code"):
         raise FetchError(f"FRED error for {series_id}: {body.get('error_message', body)}")
     observations = body.get("observations", [])
@@ -96,21 +151,20 @@ def _fred_latest(series_id: str) -> tuple[float, str]:
 
 
 def _fred_cpi_yoy(series_id: str) -> tuple[float, str]:
-    resp = _http_get(
-        FRED_BASE,
-        params={
+    body = _fred_get(
+        series_id,
+        {
             "series_id": series_id,
             "api_key": _fred_api_key(),
             "file_type": "json",
             "sort_order": "desc",
             "limit": 24,
         },
-        timeout=30,
         label=f"FRED CPI {series_id}",
     )
     observations = [
         (obs["date"], float(obs["value"]))
-        for obs in resp.json().get("observations", [])
+        for obs in body.get("observations", [])
         if obs.get("value") not in (None, ".", "")
     ]
     if len(observations) < 13:
@@ -236,42 +290,40 @@ def fetch_chart_history(settings: dict[str, Any], *, months: int = 6) -> list[tu
 
     if source == "fred":
         start = (datetime.now(timezone.utc) - timedelta(days=months * 31)).strftime("%Y-%m-%d")
-        resp = requests.get(
-            FRED_BASE,
-            params={
+        body = _fred_get(
+            settings["series"],
+            {
                 "series_id": settings["series"],
                 "api_key": _fred_api_key(),
                 "file_type": "json",
                 "sort_order": "asc",
                 "observation_start": start,
             },
-            timeout=30,
+            label=f"FRED {settings['series']}",
         )
-        resp.raise_for_status()
         observations = [
             (obs["date"], float(obs["value"]))
-            for obs in resp.json().get("observations", [])
+            for obs in body.get("observations", [])
             if obs.get("value") not in (None, ".", "")
         ]
         return observations
 
     if source == "fred_cpi_yoy":
         limit = max(24, months * 2 + 14)
-        resp = requests.get(
-            FRED_BASE,
-            params={
+        body = _fred_get(
+            settings["series"],
+            {
                 "series_id": settings["series"],
                 "api_key": _fred_api_key(),
                 "file_type": "json",
                 "sort_order": "desc",
                 "limit": limit,
             },
-            timeout=30,
+            label=f"FRED CPI {settings['series']}",
         )
-        resp.raise_for_status()
         raw = sorted(
             (obs["date"], float(obs["value"]))
-            for obs in resp.json().get("observations", [])
+            for obs in body.get("observations", [])
             if obs.get("value") not in (None, ".", "")
         )
         return [
