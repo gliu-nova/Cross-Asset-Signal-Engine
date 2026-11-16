@@ -102,6 +102,31 @@ posting:
       category: crypto
       rarity: 60
       audience_relevance: 70
+    hype:
+      themes: [risk_on, crypto]
+      category: crypto
+      rarity: 64
+      audience_relevance: 76
+    xrp:
+      themes: [risk_on, crypto]
+      category: crypto
+      rarity: 66
+      audience_relevance: 76
+    link:
+      themes: [risk_on, crypto]
+      category: crypto
+      rarity: 64
+      audience_relevance: 76
+    tao:
+      themes: [risk_on, crypto]
+      category: crypto
+      rarity: 62
+      audience_relevance: 76
+    zec:
+      themes: [risk_on, crypto]
+      category: crypto
+      rarity: 62
+      audience_relevance: 76
     btc_funding:
       themes: [crypto, risk_on]
       category: crypto
@@ -635,6 +660,88 @@ indicators:
         source: kraken
         pair: SOLUSD
         tolerance_pct: 1.0
+
+  # HYPE has no Yahoo ticker (HYPE-USD 404s). Kraken is primary.
+  hype:
+    name: "Hyperliquid"
+    source: kraken
+    pair: HYPEUSD
+    cooldown_hours: 6
+    normal_alert: 8
+    major_alert: 12
+    emergency_alert: 18
+    quality:
+      schedule: crypto_24_7
+      max_stale_hours: 4
+      verify:
+        source: coingecko
+        coin_id: hyperliquid
+        tolerance_pct: 1.0
+
+  xrp:
+    name: "XRP"
+    source: yahoo
+    symbol: "XRP-USD"
+    cooldown_hours: 6
+    normal_alert: 6
+    major_alert: 10
+    emergency_alert: 14
+    quality:
+      schedule: crypto_24_7
+      max_stale_hours: 4
+      verify:
+        source: kraken
+        pair: XRPUSD
+        tolerance_pct: 1.0
+
+  link:
+    name: "Chainlink"
+    source: yahoo
+    symbol: "LINK-USD"
+    cooldown_hours: 6
+    normal_alert: 7
+    major_alert: 11
+    emergency_alert: 16
+    quality:
+      schedule: crypto_24_7
+      max_stale_hours: 4
+      verify:
+        source: kraken
+        pair: LINKUSD
+        tolerance_pct: 1.0
+
+  # Yahoo lists Bittensor as TAO22974-USD. TAO-USD 404s.
+  tao:
+    name: "Bittensor"
+    source: yahoo
+    symbol: "TAO22974-USD"
+    cooldown_hours: 6
+    normal_alert: 8
+    major_alert: 12
+    emergency_alert: 18
+    quality:
+      schedule: crypto_24_7
+      max_stale_hours: 4
+      verify:
+        source: kraken
+        pair: TAOUSD
+        tolerance_pct: 1.5
+
+  zec:
+    name: "Zcash"
+    source: yahoo
+    symbol: "ZEC-USD"
+    cooldown_hours: 6
+    normal_alert: 8
+    major_alert: 12
+    emergency_alert: 18
+    quality:
+      schedule: crypto_24_7
+      max_stale_hours: 4
+      verify:
+        source: kraken
+        pair: ZECUSD
+        tolerance_pct: 1.5
 
   fear_greed:
     name: "Crypto Fear & Greed Index"

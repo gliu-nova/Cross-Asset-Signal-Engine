@@ -94,7 +94,8 @@ MACRO_INDICATORS = {
 }
 
 PRICE_INDICATORS = frozenset({
-    "btc", "eth", "sol", "gold", "silver", "oil",
+    "btc", "eth", "sol", "hype", "xrp", "link", "tao", "zec",
+    "gold", "silver", "oil",
     "sp500", "nasdaq100", "qqq",
     "bond_etf_agg", "bond_etf_bnd",
     "crypto_etf_fbtc",
@@ -122,6 +123,7 @@ DIFFUSION_INDEX_LABELS: dict[str, str] = {
 
 SHORT_LABELS: dict[str, str] = {
     "btc": "BTC", "eth": "ETH", "sol": "SOL",
+    "hype": "HYPE", "xrp": "XRP", "link": "LINK", "tao": "TAO", "zec": "ZEC",
     "sp500": "S&P 500", "nasdaq100": "NASDAQ", "qqq": "QQQ",
     "bond_etf_agg": "AGG", "bond_etf_bnd": "BND",
     "crypto_etf_ibit": "IBIT", "crypto_etf_fbtc": "FBTC",
@@ -1464,13 +1466,18 @@ def _takeaway_for_alert(alert: AlertTrigger, history: MoveHistory | None = None)
     if history.is_all_time_high:
         if ind in ("gold", "silver"):
             return "defensive demand remains strong"
-        if ind in ("btc", "eth", "sol", "sp500", "nasdaq100"):
+        if ind in ("btc", "eth", "sol", "hype", "xrp", "link", "tao", "zec", "sp500", "nasdaq100"):
             return "improving risk appetite"
         return "momentum building at new highs"
     paired: dict[str, tuple[str, str]] = {
         "btc": ("improving risk appetite across crypto", "selling pressure building across crypto"),
         "eth": ("alt momentum building", "alt weakness spreading"),
         "sol": ("high-beta risk appetite improving", "high-beta risk appetite fading"),
+        "hype": ("high-beta crypto demand building", "high-beta crypto demand fading"),
+        "xrp": ("large-cap crypto demand building", "large-cap crypto demand fading"),
+        "link": ("alt momentum building", "alt weakness spreading"),
+        "tao": ("high-beta crypto demand building", "high-beta crypto demand fading"),
+        "zec": ("privacy-coin demand building", "privacy-coin demand fading"),
         "sp500": ("improving risk appetite", "fading risk appetite"),
         "nasdaq100": ("growth risk appetite improving", "growth risk appetite fading"),
         "gold": ("defensive demand rising", "defensive demand easing"),
@@ -1558,6 +1565,12 @@ def _format_value(alert: AlertTrigger) -> str:
         return f"{v:.1f}M shares"
     if alert.indicator in ETF_ACTIVITY_INDICATORS:
         return f"{v / 1e6:.1f}M shares"
+    if alert.indicator in {"hype", "xrp", "link", "tao", "zec"}:
+        if v >= 100:
+            return f"${v:,.1f}"
+        if v >= 1:
+            return f"${v:,.2f}"
+        return f"${v:,.4f}"
     if alert.indicator == "jobless_claims":
         if v >= 1000:
             k = v / 1000

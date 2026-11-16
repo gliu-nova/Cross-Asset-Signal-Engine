@@ -2,7 +2,7 @@
 
 Monitors market and macro indicators, stores readings in SQLite, and posts to X/Twitter when **per-indicator rules** you define are triggered. A **posting engine** scores, groups, and rate-limits tweets (default cap: **8** regular posts/day; emergencies bypass the cap).
 
-## Indicators (43)
+## Indicators (53)
 
 Configured in `config.yaml`. Core groups:
 
@@ -10,7 +10,7 @@ Configured in `config.yaml`. Core groups:
 |-------|----------|--------|
 | Equities / ETFs | `sp500`, `nasdaq100`, `qqq`, bond/crypto ETFs | Yahoo |
 | Volatility / FX / commodities | `vix`, `dxy`, `gold`, `silver`, `oil`, `move`, `hy_spread` | Yahoo / FRED |
-| Crypto spot | `btc`, `eth`, `sol` | Yahoo (cross-verified vs **Kraken**) |
+| Crypto spot | `btc`, `eth`, `sol`, `xrp`, `link`, `tao`, `zec`, `hype` | Yahoo (Kraken for HYPE); cross-verified vs Kraken or CoinGecko |
 | Crypto derivatives | funding, basis, exchange spread, liquidations | OKX / Hyperliquid / Kraken+Coinbase |
 | Sentiment | `fear_greed` | alternative.me |
 | Macro / rates / housing | Fed funds, treasuries, CPI, M2, Case-Shiller, etc. | FRED |
@@ -269,14 +269,14 @@ Before saving or tweeting, each reading passes:
 - **API health** — pings FRED, Yahoo, Kraken, Fear & Greed, OKX, Hyperliquid, Coinbase, FINRA at run start
 - **Type/NaN check** — rejects null, NaN, or non-numeric values
 - **Staleness** — per-indicator `max_stale_hours` (auto by source: crypto 12h, equities 48h, macro 720h)
-- **Cross-verification** — optional second source must agree within `tolerance_pct` (configured for SP500, NASDAQ, DXY, gold, BTC, ETH, SOL vs Kraken, funding/basis, etc.)
+- **Cross-verification** — optional second source must agree within `tolerance_pct` (configured for SP500, NASDAQ, DXY, gold, BTC, ETH, SOL, XRP, LINK, TAO, ZEC vs Kraken, HYPE vs CoinGecko, funding/basis, etc.)
 - **Market hours** — `us_equity` indicators suppress **alerts** outside 9:30–16:00 ET Mon–Fri (data still saved)
 
 ```bash
 python run.py --health   # API health only
 ```
 
-**Crypto (BTC/ETH/SOL)** uses Yahoo Finance, cross-checked against **Kraken** (see `quality.verify` in config).
+**Crypto spot (BTC, ETH, SOL, XRP, LINK, TAO, ZEC)** uses Yahoo Finance, cross-checked against **Kraken**. **HYPE** uses Kraken, cross-checked against **CoinGecko** (Yahoo has no HYPE-USD ticker). Bittensor's Yahoo symbol is `TAO22974-USD`. See `quality.verify` in config.
 
 ## Polling schedule
 
@@ -284,7 +284,7 @@ GitHub Actions **ticks every hour** (external cron at `:31` UTC); each indicator
 
 | Tier | Indicators | Poll interval |
 |------|------------|---------------|
-| Crypto 24/7 | BTC, ETH, SOL, Fear & Greed | every 10 min |
+| Crypto 24/7 | BTC, ETH, SOL, HYPE, XRP, LINK, TAO, ZEC, Fear & Greed | every 10 min |
 | US equity / volatile | SPY, QQQ, VIX, DXY, Gold, Silver, Oil | every 10 min (market hours), 60 min off-hours |
 | Rates & FX | 10Y, yield curve, Fed funds, MOVE, HY spread | every 30 min |
 | Macro (FRED) | CPI, unemployment, PMI proxies, M2, etc. | every 6 hours |

@@ -9,7 +9,8 @@ from src.posting.models import AlertTrigger
 
 # Only claim ATH for series that trend to new highs (not yields, spreads, macro)
 ATH_INDICATORS = {
-    "btc", "eth", "sol", "sp500", "nasdaq100", "qqq",
+    "btc", "eth", "sol", "hype", "xrp", "link", "tao", "zec",
+    "sp500", "nasdaq100", "qqq",
     "crypto_etf_fbtc",
     "gold", "silver",
 }

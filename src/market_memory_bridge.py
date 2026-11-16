@@ -27,7 +27,8 @@ if _dp_vol_map:
     INDICATOR_MEMORY_MAP.setdefault("dark_pool_spy", _dp_vol_map)
 
 PRICE_DIRECTION_INDICATORS = frozenset({
-    "btc", "eth", "sol", "sp500", "nasdaq100", "qqq",
+    "btc", "eth", "sol", "hype", "xrp", "link", "tao", "zec",
+    "sp500", "nasdaq100", "qqq",
     "bond_etf_agg", "bond_etf_bnd", "crypto_etf_ibit", "crypto_etf_fbtc",
     "gold", "silver", "oil",
 })

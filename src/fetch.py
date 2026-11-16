@@ -12,6 +12,7 @@ FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 COINGECKO_BASE = "https://api.coingecko.com/api/v3/simple/price"
 BINANCE_BASE = "https://api.binance.com/api/v3/ticker/price"
 KRAKEN_BASE = "https://api.kraken.com/0/public/Ticker"
+KRAKEN_OHLC = "https://api.kraken.com/0/public/OHLC"
 FEAR_GREED_BASE = "https://api.alternative.me/fng/"
 
 
@@ -245,6 +246,22 @@ def _kraken_latest(pair: str) -> tuple[float, str]:
     return float(ticker["c"][0]), now
 
 
+def _kraken_ohlc(pair: str, *, days: int) -> list[tuple[str, float]]:
+    resp = _http_get(KRAKEN_OHLC, params={"pair": pair, "interval": 1440}, label=f"Kraken OHLC {pair}")
+    result = resp.json().get("result") or {}
+    rows = next((v for v in result.values() if isinstance(v, list)), None)
+    if not rows:
+        return []
+    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    out: list[tuple[str, float]] = []
+    for row in rows:
+        observed = datetime.fromtimestamp(int(row[0]), timezone.utc)
+        if observed < cutoff:
+            continue
+        out.append((observed.strftime("%Y-%m-%d"), float(row[4])))
+    return out
+
+
 def _binance_latest(symbol: str) -> tuple[float, str]:
     resp = requests.get(BINANCE_BASE, params={"symbol": symbol}, timeout=15)
     try:
@@ -277,6 +294,9 @@ def fetch_chart_history(settings: dict[str, Any], *, months: int = 6) -> list[tu
     """Daily history for chart rendering. Falls back to source APIs."""
     source = settings["source"]
     period = f"{months}mo"
+
+    if source == "kraken":
+        return _kraken_ohlc(settings["pair"], days=months * 31)
 
     if source == "yahoo":
         ticker = yf.Ticker(settings["symbol"])
