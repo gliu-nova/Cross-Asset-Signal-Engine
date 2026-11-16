@@ -321,11 +321,12 @@ Older runs failed if **any single indicator** errored (e.g. stale MOVE data). Ru
 2. Run `python run.py --test-post` (with `DRY_RUN=0`) — confirms posting works end-to-end
 3. If `401 Unauthorized` → regenerate **Access Token & Secret** (app needs **Read and write**)
 4. If `402 Payment Required` → your X API plan has **no post credits**. Add credits or upgrade at [developer.x.com](https://developer.x.com/) — auth can work while posting is blocked
-5. **Zero tweets is normal** on quiet days — thresholds must fire first (bot needs 2+ readings before % rules apply)
+5. If `403 Forbidden` on a chart, the bot posts the same text without the image and logs `status`, `title`, `detail`, `type`, and `x-access-level`. A 403 on that text-only retry still fails the run. Read the log before regenerating tokens: a later text post from the same secrets means X refused that request.
+6. **Zero tweets is normal** on quiet days — thresholds must fire first (bot needs 2+ readings before % rules apply)
 
 ### Validate in CI
 
-Every GitHub Actions run calls `python run.py --validate` first. If this step fails, secrets are missing or Twitter auth is broken — fix before expecting live posts.
+Every GitHub Actions run calls `python run.py --validate` first. External-cron skips `get_me` (`CHECK_TWITTER=0`). A green validate step means the secrets are present and the data APIs answered. It does not prove X will accept a post. Use a manual dispatch or `python run.py --test-post` with `DRY_RUN=0` for that. If validate fails, secrets are missing or a checked API is down.
 
 ## Notes
 

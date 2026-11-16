@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import sqlite3
+import tempfile
 import unittest
+from contextlib import redirect_stderr
 from datetime import datetime, timedelta, timezone
+from io import StringIO
 from unittest.mock import MagicMock, patch
 
 from src.alerts import check_alert, emergency_escalation_allows
@@ -13,7 +16,7 @@ from src.db import hours_since_indicator_post, prune_old_readings, record_post
 from src.posting.context_explain import classify_post_skip
 from src.posting.decide import decide_tweet_type
 from src.posting.models import AlertTrigger
-from src.twitter_client import _is_transient_twitter_error, post_tweet
+from src.twitter_client import _is_transient_twitter_error, _twitter_error_detail, post_tweet
 
 
 def _alert(
@@ -328,6 +331,121 @@ class TwitterRetryTests(unittest.TestCase):
         ]
         post_tweet("hello")
         self.assertEqual(client.create_tweet.call_count, 2)
+
+    def test_error_detail_includes_x_body(self) -> None:
+        import tweepy
+
+        exc = tweepy.Forbidden(_forbidden_response())
+        detail = _twitter_error_detail(exc)
+        self.assertIn("status=403", detail)
+        self.assertIn("title=Forbidden", detail)
+        self.assertIn("detail=You are not permitted to perform this action.", detail)
+        self.assertIn("type=about:blank", detail)
+        self.assertIn("x-access-level=read-write", detail)
+
+    @patch.dict(
+        "os.environ",
+        {
+            "DRY_RUN": "0",
+            "TWITTER_API_KEY": "k",
+            "TWITTER_API_SECRET": "s",
+            "TWITTER_ACCESS_TOKEN": "t",
+            "TWITTER_ACCESS_TOKEN_SECRET": "ts",
+        },
+    )
+    @patch("src.twitter_client.tweepy.API")
+    @patch("src.twitter_client.tweepy.OAuth1UserHandler")
+    @patch("src.twitter_client.tweepy.Client")
+    def test_media_403_posts_text_only(
+        self,
+        mock_client_cls: MagicMock,
+        _oauth: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        import tweepy
+
+        client = mock_client_cls.return_value
+        mock_api_cls.return_value.media_upload.return_value.media_id = 99
+        client.create_tweet.side_effect = [tweepy.Forbidden(_forbidden_response()), None]
+        err = StringIO()
+        with tempfile.NamedTemporaryFile(suffix=".png") as chart, redirect_stderr(err):
+            post_tweet("hello", media_path=chart.name)
+        self.assertEqual(client.create_tweet.call_count, 2)
+        first = client.create_tweet.call_args_list[0].kwargs
+        second = client.create_tweet.call_args_list[1].kwargs
+        self.assertEqual(first["media_ids"], [99])
+        self.assertIsNone(second["media_ids"])
+        self.assertIn("retrying text-only", err.getvalue())
+        self.assertIn("x-access-level=read-write", err.getvalue())
+
+    @patch.dict(
+        "os.environ",
+        {
+            "DRY_RUN": "0",
+            "TWITTER_API_KEY": "k",
+            "TWITTER_API_SECRET": "s",
+            "TWITTER_ACCESS_TOKEN": "t",
+            "TWITTER_ACCESS_TOKEN_SECRET": "ts",
+        },
+    )
+    @patch("src.twitter_client.tweepy.Client")
+    def test_text_403_still_fails(self, mock_client_cls: MagicMock) -> None:
+        import tweepy
+
+        client = mock_client_cls.return_value
+        client.create_tweet.side_effect = tweepy.Forbidden(_forbidden_response())
+        err = StringIO()
+        with redirect_stderr(err), self.assertRaises(tweepy.Forbidden):
+            post_tweet("hello")
+        self.assertEqual(client.create_tweet.call_count, 1)
+        self.assertIn("Tweet failed: status=403", err.getvalue())
+
+    @patch.dict(
+        "os.environ",
+        {
+            "DRY_RUN": "0",
+            "TWITTER_API_KEY": "k",
+            "TWITTER_API_SECRET": "s",
+            "TWITTER_ACCESS_TOKEN": "t",
+            "TWITTER_ACCESS_TOKEN_SECRET": "ts",
+        },
+    )
+    @patch("src.twitter_client.tweepy.API")
+    @patch("src.twitter_client.tweepy.OAuth1UserHandler")
+    @patch("src.twitter_client.tweepy.Client")
+    def test_upload_failure_posts_text_only(
+        self,
+        mock_client_cls: MagicMock,
+        _oauth: MagicMock,
+        mock_api_cls: MagicMock,
+    ) -> None:
+        import tweepy
+
+        client = mock_client_cls.return_value
+        mock_api_cls.return_value.media_upload.side_effect = tweepy.Forbidden(_forbidden_response())
+        err = StringIO()
+        with tempfile.NamedTemporaryFile(suffix=".png") as chart, redirect_stderr(err):
+            post_tweet("hello", media_path=chart.name)
+        client.create_tweet.assert_called_once()
+        self.assertIsNone(client.create_tweet.call_args.kwargs["media_ids"])
+        self.assertIn("Media upload failed", err.getvalue())
+
+
+def _forbidden_response() -> object:
+    class Response:
+        status_code = 403
+        reason = "Forbidden"
+        headers = {"x-access-level": "read-write"}
+
+        def json(self) -> dict:
+            return {
+                "title": "Forbidden",
+                "detail": "You are not permitted to perform this action.",
+                "type": "about:blank",
+                "status": 403,
+            }
+
+    return Response()
 
 
 class EngineBatchMarkTests(unittest.TestCase):
